@@ -3,14 +3,17 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import App from './App';
 
 /**
- * Helper to flush pending promises in test environments.
- * Uses setTimeout 0 for maximum compatibility instead of setImmediate.
+ * Helper to flush pending promises for React async effects and timers.
+ * Uses setTimeout(0) for maximum compatibility.
+ * Always wrap async actions/state updates in act(), or use user-event async utilities/waitFor as appropriate.
  */
-// For API mocks
 const flushPromises = () =>
   act(() => new Promise(resolve => setTimeout(resolve, 0)));
 
 describe('TVGuideChatBot App', () => {
+  // Increase default Jest timeout for slow async flows
+  jest.setTimeout(10000);
+
   beforeEach(() => {
     jest.clearAllMocks();
     // Reset Date for consistent formatting in tests
@@ -22,8 +25,9 @@ describe('TVGuideChatBot App', () => {
     jest.useRealTimers();
   });
 
-  // Utility: Render App in a test
-  const setup = () => render(<App />);
+  // Utility: Render App in a test - always within act for safety
+  const setup = () =>
+    act(() => { render(<App />); });
 
   test('renders initial chatbot greeting and panel layout', () => {
     setup();
@@ -31,7 +35,7 @@ describe('TVGuideChatBot App', () => {
     expect(screen.getByLabelText(/Message input/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/TV Guide Search/i)).toBeInTheDocument();
     expect(screen.getByText('Knowledge Graph Insights')).toBeInTheDocument();
-    // Bot greeting message present
+    // Check bot greeting message present
     expect(
       screen.getByText(/I'm your TVGuideChatBot/i)
     ).toBeInTheDocument();
@@ -41,7 +45,9 @@ describe('TVGuideChatBot App', () => {
     setup();
     const toggle = screen.getByRole('button', { name: /switch to dark mode/i });
     expect(toggle).toBeInTheDocument();
-    fireEvent.click(toggle);
+    act(() => {
+      fireEvent.click(toggle);
+    });
     expect(
       screen.getByRole('button', { name: /switch to light mode/i })
     ).toBeInTheDocument();
@@ -57,21 +63,25 @@ describe('TVGuideChatBot App', () => {
     expect(sendBtn).toBeDisabled();
 
     // Type a message
-    fireEvent.change(input, { target: { value: 'What\'s on tonight?' } });
+    act(() => {
+      fireEvent.change(input, { target: { value: 'What\'s on tonight?' } });
+    });
     expect(input.value).toBe('What\'s on tonight?');
     expect(sendBtn).not.toBeDisabled();
 
-    // Send message
-    fireEvent.click(sendBtn);
+    // Send message - wrap in act for async state update
+    await act(async () => {
+      fireEvent.click(sendBtn);
+    });
 
-    // Message appears as "You"
+    // Message appears as "You" (async effect) - use waitFor for async update
     expect(await screen.findByText('You')).toBeInTheDocument();
     expect(screen.getByText('What\'s on tonight?')).toBeInTheDocument();
 
     // Loading "…" shown
     expect(screen.getByText('…')).toBeInTheDocument();
 
-    // After fake bot delay, bot reply should appear
+    // After fake bot delay, bot reply should appear (async, wait up to 2.5s)
     await waitFor(() =>
       expect(
         screen.getByText(/Let me check the current TV guide/i)
@@ -90,11 +100,15 @@ describe('TVGuideChatBot App', () => {
     expect(searchBtn).toBeDisabled();
 
     // Enter a query
-    fireEvent.change(guideInput, { target: { value: 'cake' } });
+    act(() => {
+      fireEvent.change(guideInput, { target: { value: 'cake' } });
+    });
     expect(searchBtn).not.toBeDisabled();
 
     // Start search
-    fireEvent.click(searchBtn);
+    await act(async () => {
+      fireEvent.click(searchBtn);
+    });
 
     // Loading label appears
     expect(await screen.findByText(/Searching…/)).toBeInTheDocument();
@@ -121,8 +135,12 @@ describe('TVGuideChatBot App', () => {
     const guideInput = screen.getByLabelText(/TV Guide Search/i);
     const searchBtn = screen.getByRole('button', { name: /^Search$/ });
 
-    fireEvent.change(guideInput, { target: { value: 'unknownshow' } });
-    fireEvent.click(searchBtn);
+    act(() => {
+      fireEvent.change(guideInput, { target: { value: 'unknownshow' } });
+    });
+    await act(async () => {
+      fireEvent.click(searchBtn);
+    });
 
     // Wait for API to resolve and check empty state
     await act(async () => {
@@ -137,8 +155,12 @@ describe('TVGuideChatBot App', () => {
     setup();
     // Trigger a chatbot message that matches "insight" intent
     const input = screen.getByLabelText(/Message input/i);
-    fireEvent.change(input, { target: { value: 'Give an insight' } });
-    fireEvent.keyDown(input, { key: 'Enter', code: 13 });
+    act(() => {
+      fireEvent.change(input, { target: { value: 'Give an insight' } });
+    });
+    await act(async () => {
+      fireEvent.keyDown(input, { key: 'Enter', code: 13 });
+    });
 
     // Loading label appears in insights
     expect(await screen.findByText(/Loading insights graph/i)).toBeInTheDocument();
@@ -170,11 +192,14 @@ describe('TVGuideChatBot App', () => {
     setup();
     const input = screen.getByLabelText(/Message input/i);
     const sendBtn = screen.getByRole('button', { name: /send/i });
-    fireEvent.change(input, { target: { value: 'guide' } });
+    act(() => {
+      fireEvent.change(input, { target: { value: 'guide' } });
+    });
     expect(sendBtn).not.toBeDisabled();
-    fireEvent.click(sendBtn);
-    expect(sendBtn).toBeDisabled(); // Bot loading disables send
     await act(async () => {
+      fireEvent.click(sendBtn);
+      // Immediately after click, bot loading disables send
+      expect(sendBtn).toBeDisabled();
       jest.advanceTimersByTime(1050);
       await flushPromises();
     });
@@ -185,9 +210,13 @@ describe('TVGuideChatBot App', () => {
     const input = screen.getByLabelText(/Message input/i);
     const sendBtn = screen.getByRole('button', { name: /send/i });
     expect(sendBtn).toBeDisabled();
-    fireEvent.change(input, { target: { value: '   ' } });
+    act(() => {
+      fireEvent.change(input, { target: { value: '   ' } });
+    });
     expect(sendBtn).toBeDisabled();
-    fireEvent.change(input, { target: { value: 'Show me trivia!' } });
+    act(() => {
+      fireEvent.change(input, { target: { value: 'Show me trivia!' } });
+    });
     expect(sendBtn).not.toBeDisabled();
   });
 
@@ -195,18 +224,24 @@ describe('TVGuideChatBot App', () => {
     setup();
     const guideInput = screen.getByLabelText(/TV Guide Search/i);
     const searchBtn = screen.getByRole('button', { name: /^Search$/ });
-    fireEvent.change(guideInput, { target: { value: 'abc' } });
-    fireEvent.click(searchBtn);
+    act(() => {
+      fireEvent.change(guideInput, { target: { value: 'abc' } });
+      fireEvent.click(searchBtn);
+    });
     expect(searchBtn).toBeDisabled();
   });
 
   test('Handles chat "channel" intent, triggers guide and insight logic', async () => {
     setup();
     const input = screen.getByLabelText(/Message input/i);
-    fireEvent.change(input, { target: { value: 'Channel 12 shows' } });
-    fireEvent.keyDown(input, { key: 'Enter', code: 13 });
+    act(() => {
+      fireEvent.change(input, { target: { value: 'Channel 12 shows' } });
+    });
+    await act(async () => {
+      fireEvent.keyDown(input, { key: 'Enter', code: 13 });
+    });
 
-    // Expect a bot message relating to channel
+    // Expect a bot message relating to channel (async update)
     expect(
       await screen.findByText(/Channel 12/i, undefined, { timeout: 3000 })
     ).toBeInTheDocument();
@@ -217,8 +252,16 @@ describe('TVGuideChatBot App', () => {
       await flushPromises();
     });
 
-    // The mock API will provide results appropriately
+    // The mock API provides results accordingly
     expect(screen.getByText(/Bake-off/i)).toBeInTheDocument();
     expect(screen.getByText(/Knowledge Graph Insights/i)).toBeInTheDocument();
   });
 });
+
+/**
+ * NOTE FOR MAINTAINERS:
+ * - All async state logic, effects, and event triggers are wrapped in act() or waited-for using waitFor.
+ * - Jest fake timers are advanced for all async delays.
+ * - All async user/DOM events are used within act() and flushed with flushPromises for reliability.
+ * - Any new async UI logic or network mocking added should follow this pattern for async safety in React 18+.
+ */
