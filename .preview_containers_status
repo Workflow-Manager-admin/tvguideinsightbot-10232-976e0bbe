@@ -1,1 +1,1 @@
-{"web_frontend": {"status": "building", "timestamp": "2025-06-26T16:35:05.726770", "url": "https://vscode-internal-6-beta.beta01.cloud.kavia.ai:3000/preview.html", "api_route": "", "self.db_env_vars": null, "error": null}}
+{"web_frontend": {"status": "running", "timestamp": "2025-06-26T16:35:21.833883", "url": "https://vscode-internal-6-beta.beta01.cloud.kavia.ai:3000/preview.html", "api_route": "", "self.db_env_vars": null, "error": null}}
