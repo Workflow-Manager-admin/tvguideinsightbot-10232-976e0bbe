@@ -3,6 +3,10 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import App from './App';
 
 /**
+ * NOTE: We deliberately increase Jest's timeout for async-heavy tests in this file via jest.setTimeout,
+ * so tests with delayed or async React flows (including fake timers/async act) do not fail spuriously.
+ * If you add new async UI, API delay mocks, or use waitFor, ensure suitable timeouts are configured.
+ *
  * Helper to flush pending promises for React async effects and timers.
  * Uses setTimeout(0) for maximum compatibility.
  * Always wrap async actions/state updates in act(), or use user-event async utilities/waitFor as appropriate.
@@ -21,8 +25,12 @@ const flushPromises = () =>
   );
 
 describe('TVGuideChatBot App', () => {
-  // Increase default Jest timeout for slow async flows
-  jest.setTimeout(10000);
+  // Ensure all tests in this file have increased timeout for async flows.
+  beforeAll(() => {
+    // PUBLIC_INTERFACE
+    // Set test timeout higher for async-heavy/jest fake timers + React flushes.
+    jest.setTimeout(10000);
+  });
 
   beforeEach(() => {
     jest.clearAllMocks();
