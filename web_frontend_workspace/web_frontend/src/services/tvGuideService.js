@@ -1,24 +1,56 @@
 //
 // tvGuideService.js - Service to communicate with backend TV Guide/Gracenote APIs for schedule/search.
 //
+// MOCK/STUB IMPLEMENTATION
+// Replace all mock logic and endpoint URLs with real Gracenote integration for production.
+// Clearly documented for easy future expansion.
+//
+
 /**
- * Service API for TVGuideChatBot frontend.
- * Includes: fetchTVGuide(query), fetchKnowledgeGraph(context).
+ * PUBLIC_INTERFACE
+ * Fetch TV Guide search results for a given query.
+ * @param {string} query - Search query, e.g., show name, channel, time.
+ * @returns {Promise<Array>} Resolves with an array of schedule/show result objects.
+ *
+ * Integration note:
+ * - Replace mock logic with a real backend call to Gracenote APIs or your backend's TV schedule endpoint.
+ * - Real usage: Add Gracenote credentials (API key, etc.) and endpoint details as required.
  */
-// PUBLIC_INTERFACE
 export async function fetchTVGuide(query) {
-  // Placeholder: Replace with real API endpoint.
-  const url = `/api/tvguide/search?q=${encodeURIComponent(query)}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`TV Guide search failed (${res.status})`);
-  return await res.json();
+  // MOCK IMPLEMENTATION: Replace with real API endpoint for production.
+  // Example production usage (to be implemented):
+  // const url = `https://data.tmsapi.com/v1.1/programs/search?api_key=YOUR_GRACENOTE_API_KEY&query=${encodeURIComponent(query)}`
+  // const res = await fetch(url);
+  // Integrate proper API credentials, backend proxy, error handling, etc.
+
+  // Stub/mock: Return static sample data.
+  return [
+    {
+      title: "Supernatural",
+      channel: "CW",
+      time: "8:00 PM",
+      description: "Sam and Dean hunt supernatural entities threatening the world."
+    },
+    {
+      title: "Planet Earth II",
+      channel: "BBC America",
+      time: "9:30 PM",
+      description: "Documentary series exploring wildlife across the globe."
+    }
+  ];
 }
 
-// PUBLIC_INTERFACE
+/**
+ * PUBLIC_INTERFACE
+ * [DEPRECATED for direct KG, now in neo4jService.js]
+ * Fetch knowledge graph insights (legacy stub).
+ * @param {string} context - Query or context for knowledge graph (e.g., show, actor).
+ * @returns {Promise<Array>} Resolves with an array, empty in this stub.
+ *
+ * Integration note:
+ * - This was used as a pass-through for knowledge graph; recommend migrating all KG calls to neo4jService.js.
+ */
 export async function fetchKnowledgeGraph(context) {
-  // Placeholder: Replace with real endpoint.
-  const url = `/api/kg/insights?context=${encodeURIComponent(context)}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Knowledge Graph fetch failed (${res.status})`);
-  return await res.json();
+  // DEPRECATED: Use neo4jService.js for actual knowledge graph access.
+  return [];
 }
