@@ -3,6 +3,24 @@ import { render, screen, fireEvent, waitFor, act, cleanup } from '@testing-libra
 import App from './App';
 
 /**
+ * Helper to dump relevant DOM for diagnostics if a test fails at a testid lookup or assertion.
+ */
+function debugIfFail(assertion, message) {
+  try {
+    assertion();
+  } catch (err) {
+    // Output the current document
+    // eslint-disable-next-line no-console
+    console.log(
+      "*** TEST FAILURE DEBUG OUTPUT ***",
+      message,
+      "\nCurrent DOM:\n",
+      document.body.innerHTML
+    );
+    throw err; // rethrow
+  }
+}
+/**
  * This file rigorously tests all async, timer, and UI update flows for the TVGuideChatBot app.
  * All async state changes, timers, and user interactions are properly wrapped in act().
  * Fake timers are set up before each test and restored after, guaranteeing deterministic and isolated async flows.
@@ -53,32 +71,33 @@ describe('TVGuideChatBot App', () => {
 
   test('renders initial chatbot greeting and panel layout', async () => {
     await setup();
-    // Query by data-testid for panels
-    expect(screen.getByTestId("chatbot-messages")).toBeInTheDocument();
-    expect(screen.getByTestId("tvguide-panel")).toBeInTheDocument();
-    expect(screen.getByTestId("insights-panel")).toBeInTheDocument();
+    // Panel presence robustly using testid:
+    debugIfFail(() => expect(screen.getByTestId("chatbot-messages")).toBeInTheDocument(), "Check chatbot-messages panel exists");
+    debugIfFail(() => expect(screen.getByTestId("tvguide-panel")).toBeInTheDocument(), "Check tvguide-panel exists");
+    debugIfFail(() => expect(screen.getByTestId("insights-panel")).toBeInTheDocument(), "Check insights-panel exists");
     // Panel headers and greeting
-    expect(screen.getByText("TVGuideChatBot")).toBeInTheDocument();
-    expect(screen.getByLabelText(/Message input/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/TV Guide Search/i)).toBeInTheDocument();
-    expect(screen.getByText('Knowledge Graph Insights')).toBeInTheDocument();
-    // Check bot greeting message present
-    expect(
-      screen.getByText(/I'm your TVGuideChatBot/i)
-    ).toBeInTheDocument();
+    debugIfFail(() => expect(screen.getByText("TVGuideChatBot")).toBeInTheDocument(), "Check TVGuideChatBot header exists");
+    debugIfFail(() => expect(screen.getByLabelText(/Message input/i)).toBeInTheDocument(), "Check chatbot input present");
+    debugIfFail(() => expect(screen.getByLabelText(/TV Guide Search/i)).toBeInTheDocument(), "Check guide input present");
+    debugIfFail(() => expect(screen.getByText('Knowledge Graph Insights')).toBeInTheDocument(), "Check insights panel header");
+    debugIfFail(
+      () => expect(screen.getByText(/I'm your TVGuideChatBot/i)).toBeInTheDocument(),
+      "Check bot greeting"
+    );
   });
 
   test('theme toggle switches theme and button text', async () => {
     await setup();
     const toggle = screen.getByRole('button', { name: /switch to dark mode/i });
-    expect(toggle).toBeInTheDocument();
+    debugIfFail(() => expect(toggle).toBeInTheDocument(), "Theme toggle 'dark' presence");
     await act(async () => {
       fireEvent.click(toggle);
       await flushPromises();
     });
-    expect(
-      screen.getByRole('button', { name: /switch to light mode/i })
-    ).toBeInTheDocument();
+    debugIfFail(
+      () => expect(screen.getByRole('button', { name: /switch to light mode/i })).toBeInTheDocument(),
+      "Theme toggle 'light' presence"
+    );
   });
 
   test('chatbot allows user messaging, disables on loading, and bot responds', async () => {
@@ -87,16 +106,16 @@ describe('TVGuideChatBot App', () => {
     const sendBtn = screen.getByTestId('chatbot-send-btn');
 
     // Initial state: input blank, send disabled
-    expect(input.value).toBe('');
-    expect(sendBtn).toBeDisabled();
+    debugIfFail(() => expect(input.value).toBe(''), "Chatbot input should be blank");
+    debugIfFail(() => expect(sendBtn).toBeDisabled(), "Chatbot sendBtn should be disabled");
 
-    // Simulate user typing message, with act wrapper
+    // Simulate user typing message
     await act(async () => {
       fireEvent.change(input, { target: { value: "What's on tonight?" } });
-      await Promise.resolve(); // allow onChange to finish
+      await Promise.resolve();
     });
-    expect(input.value).toBe("What's on tonight?");
-    expect(sendBtn).not.toBeDisabled();
+    debugIfFail(() => expect(input.value).toBe("What's on tonight?"), "Chatbot input value after type");
+    debugIfFail(() => expect(sendBtn).not.toBeDisabled(), "Chatbot sendBtn enabled after user input");
 
     // Send message
     await act(async () => {
@@ -106,22 +125,28 @@ describe('TVGuideChatBot App', () => {
 
     // Message appears as "You"
     await waitFor(() => {
-      expect(screen.getByTestId('chatbot-message-user')).toHaveTextContent("What's on tonight?");
+      debugIfFail(
+        () => expect(screen.getByTestId('chatbot-message-user')).toHaveTextContent("What's on tonight?"),
+        "User-to-bot message should appear"
+      );
     });
 
-    // "…" shown while bot loading
-    expect(screen.getByTestId('chatbot-loading')).toBeInTheDocument();
+    // "…" shown while bot loading (by testid, robust to text changes)
+    debugIfFail(() => expect(screen.getByTestId('chatbot-loading')).toBeInTheDocument(), "Bot loading indicator");
 
-    // Advance all timers and microtasks for bot's fake async reply and followup effects
+    // Advance all timers for bot's fake async reply and effects
     await act(async () => {
       jest.runOnlyPendingTimers();
       await Promise.resolve();
       await flushPromises();
     });
 
-    // Bot reply should now appear (use getByTestId on bot message)
+    // Bot reply should now appear (using testid, robust)
     await waitFor(() => {
-      expect(screen.getByTestId('chatbot-message-bot')).toHaveTextContent(/Let me check the current TV guide/i);
+      debugIfFail(
+        () => expect(screen.getByTestId('chatbot-message-bot')).toHaveTextContent(/Let me check the current TV guide/i),
+        "Bot reply to user"
+      );
     });
   });
 
@@ -130,15 +155,14 @@ describe('TVGuideChatBot App', () => {
     const guideInput = screen.getByTestId('guide-search-input');
     const searchBtn = screen.getByTestId('guide-search-btn');
 
-    // Input present, button disabled initially
-    expect(guideInput.value).toBe('');
-    expect(searchBtn).toBeDisabled();
+    debugIfFail(() => expect(guideInput.value).toBe(''), "Guide input blank before search");
+    debugIfFail(() => expect(searchBtn).toBeDisabled(), "Guide searchBtn disabled with blank input");
 
     await act(async () => {
       fireEvent.change(guideInput, { target: { value: 'cake' } });
       await flushPromises();
     });
-    expect(searchBtn).not.toBeDisabled();
+    debugIfFail(() => expect(searchBtn).not.toBeDisabled(), "Guide searchBtn enabled after input");
 
     // Start search
     await act(async () => {
@@ -146,30 +170,35 @@ describe('TVGuideChatBot App', () => {
       await flushPromises();
     });
 
-    // Loading label appears (use findByTestId for async)
-    expect(await screen.findByTestId('guide-loading-indicator')).toBeInTheDocument();
+    // Loading label appears (check using findByTestId to wait for async, robust to split text)
+    debugIfFail(
+      async () => expect(await screen.findByTestId('guide-loading-indicator')).toBeInTheDocument(),
+      "Guide loading indicator during async search"
+    );
 
-    // Faking delay for fetchTVGuide mock - flush all timers/microtasks
+    // Simulate fetchTVGuide delay
     await act(async () => {
       jest.runOnlyPendingTimers();
       await flushPromises();
     });
 
-    // Guide shows results (using data-testid for result list and row)
+    // Guide shows results (by list testid and rows)
     const list = await screen.findByTestId('guide-content-list');
-    expect(list).toBeInTheDocument();
-    // Validate first row title
-    expect(await screen.findByTestId('guide-result-title-0')).toHaveTextContent(/Great Cake Bake-off/i);
-    expect(screen.getByTestId('guide-result-title-1')).toHaveTextContent(/Late Night with Cake/i);
-    expect(screen.getByTestId('guide-result-channel-0')).toHaveTextContent(/Channel 5/i);
-    expect(screen.getByTestId('guide-result-channel-1')).toHaveTextContent(/Talk TV/i);
-    expect(screen.getByTestId('guide-result-description-0')).toHaveTextContent(/desserts/);
-    expect(screen.getByTestId('guide-result-description-1')).toHaveTextContent(/guests/);
+    debugIfFail(() => expect(list).toBeInTheDocument(), "Guide results list appears");
+    debugIfFail(
+      async () => expect(await screen.findByTestId('guide-result-title-0')).toHaveTextContent(/Great Cake Bake-off/i),
+      "Guide first result title"
+    );
+    debugIfFail(() => expect(screen.getByTestId('guide-result-title-1')).toHaveTextContent(/Late Night with Cake/i), "Guide second result title");
+    debugIfFail(() => expect(screen.getByTestId('guide-result-channel-0')).toHaveTextContent(/Channel 5/i), "Guide first channel");
+    debugIfFail(() => expect(screen.getByTestId('guide-result-channel-1')).toHaveTextContent(/Talk TV/i), "Guide second channel");
+    debugIfFail(() => expect(screen.getByTestId('guide-result-description-0')).toHaveTextContent(/desserts/), "Guide first description");
+    debugIfFail(() => expect(screen.getByTestId('guide-result-description-1')).toHaveTextContent(/guests/), "Guide second description");
   });
 
   test('TVGuidePanel shows "No results found." if guideData is empty', async () => {
     await setup();
-    // Simulate a search with empty guide data
+    // Simulate search for no results
     const guideInput = screen.getByTestId('guide-search-input');
     const searchBtn = screen.getByTestId('guide-search-btn');
 
@@ -182,18 +211,16 @@ describe('TVGuideChatBot App', () => {
       await flushPromises();
     });
 
-    // Wait for mock API delay and flush timers/promises
     await act(async () => {
       jest.runOnlyPendingTimers();
       await flushPromises();
     });
-    // Should show the "No results found." label using data-testid
-    expect(screen.getByTestId('guide-empty-state')).toBeInTheDocument();
+    debugIfFail(() => expect(screen.getByTestId('guide-empty-state')).toBeInTheDocument(), "Guide empty state");
   });
 
   test('InsightsPanel displays loading and result states', async () => {
     await setup();
-    // Trigger a chatbot message that matches "insight" intent
+    // Trigger insight flow
     const input = screen.getByLabelText(/Message input/i);
     await act(async () => {
       fireEvent.change(input, { target: { value: 'Give an insight' } });
@@ -204,28 +231,30 @@ describe('TVGuideChatBot App', () => {
       await Promise.resolve();
     });
 
-    // Loading label appears while fetching insights (by data-testid)
-    expect(await screen.findByTestId('insights-loading-indicator')).toBeInTheDocument();
+    // Loading label appears while fetching insights
+    debugIfFail(
+      async () => expect(await screen.findByTestId('insights-loading-indicator')).toBeInTheDocument(),
+      "Insights loading indicator"
+    );
 
-    // Advance timers and all async after the mock network delay (bot and insights both async)
+    // Advance timers and async for loaded state
     await act(async () => {
       jest.runOnlyPendingTimers();
       await Promise.resolve();
       await flushPromises();
     });
 
-    // Insights should appear using data-testid
+    // Insights rendered (use data-testid for async robustness)
     const list = await screen.findByTestId('insights-content-list');
-    expect(list).toBeInTheDocument();
-    expect(screen.getByTestId('insights-result-title-0')).toHaveTextContent(/Did you know/i);
-    expect(screen.getByTestId('insights-result-detail-0')).toHaveTextContent(/has won 4 awards/i);
-    expect(screen.getByTestId('insights-result-title-1')).toHaveTextContent(/Related Shows/i);
+    debugIfFail(() => expect(list).toBeInTheDocument(), "Insights result list appears");
+    debugIfFail(() => expect(screen.getByTestId('insights-result-title-0')).toHaveTextContent(/Did you know/i), "Insights title 0");
+    debugIfFail(() => expect(screen.getByTestId('insights-result-detail-0')).toHaveTextContent(/has won 4 awards/i), "Insights detail 0");
+    debugIfFail(() => expect(screen.getByTestId('insights-result-title-1')).toHaveTextContent(/Related Shows/i), "Insights title 1");
   });
 
   test('InsightsPanel displays empty state before interaction', async () => {
     await setup();
-    // Before any search or message, it shows empty state message (by data-testid)
-    expect(screen.getByTestId('insights-empty-state')).toBeInTheDocument();
+    debugIfFail(() => expect(screen.getByTestId('insights-empty-state')).toBeInTheDocument(), "Insights panel initial empty state");
   });
 
   test('Button disables and re-enables correctly on bot loading', async () => {
@@ -236,34 +265,33 @@ describe('TVGuideChatBot App', () => {
       fireEvent.change(input, { target: { value: 'guide' } });
       await flushPromises();
     });
-    expect(sendBtn).not.toBeDisabled();
+    debugIfFail(() => expect(sendBtn).not.toBeDisabled(), "Chatbot sendBtn enabled before submit");
     await act(async () => {
       fireEvent.click(sendBtn);
       await flushPromises();
-      // Immediately after click, bot loading disables send
-      expect(sendBtn).toBeDisabled();
+      // Should disable instantly during loading
+      debugIfFail(() => expect(sendBtn).toBeDisabled(), "Chatbot sendBtn disables on bot loading");
       jest.runOnlyPendingTimers();
       await flushPromises();
     });
-    // After bot loading, should be re-enabled; ensure stabilization
-    await waitFor(() => expect(sendBtn).not.toBeDisabled());
+    await waitFor(() => debugIfFail(() => expect(sendBtn).not.toBeDisabled(), "Chatbot sendBtn re-enabled after loading"));
   });
 
   test('ChatbotPanel disables send button when input is empty or whitespace', async () => {
     await setup();
     const input = screen.getByLabelText(/Message input/i);
     const sendBtn = screen.getByTestId('chatbot-send-btn');
-    expect(sendBtn).toBeDisabled();
+    debugIfFail(() => expect(sendBtn).toBeDisabled(), "Send button disabled on blank");
     await act(async () => {
       fireEvent.change(input, { target: { value: '   ' } });
       await flushPromises();
     });
-    expect(sendBtn).toBeDisabled();
+    debugIfFail(() => expect(sendBtn).toBeDisabled(), "Send button disabled on whitespace");
     await act(async () => {
       fireEvent.change(input, { target: { value: 'Show me trivia!' } });
       await flushPromises();
     });
-    expect(sendBtn).not.toBeDisabled();
+    debugIfFail(() => expect(sendBtn).not.toBeDisabled(), "Send button enabled with non-whitespace");
   });
 
   test('TVGuidePanel disables search button on loading', async () => {
@@ -275,7 +303,7 @@ describe('TVGuideChatBot App', () => {
       fireEvent.click(searchBtn);
       await flushPromises();
     });
-    expect(searchBtn).toBeDisabled();
+    debugIfFail(() => expect(searchBtn).toBeDisabled(), "Guide searchBtn disables on loading");
   });
 
   test('Handles chat "channel" intent, triggers guide and insight logic', async () => {
@@ -290,30 +318,34 @@ describe('TVGuideChatBot App', () => {
       await Promise.resolve();
     });
 
-    // Bot message should relate to channel, after UI updates
+    // Bot message should relate to channel
     await waitFor(() => {
-      expect(screen.getByTestId('chatbot-message-bot')).toHaveTextContent(/Channel 12/);
+      debugIfFail(
+        () => expect(screen.getByTestId('chatbot-message-bot')).toHaveTextContent(/Channel 12/),
+        "Bot reply contains channel"
+      );
     });
 
-    // Advance all timers and flush for both guide API and insights response
+    // Advance all timers and flush for both guide & insights
     await act(async () => {
       jest.runOnlyPendingTimers();
       await Promise.resolve();
       await flushPromises();
     });
 
-    // TV guide panel is present and populated (force wait for async finish)
+    // TV guide panel present and populated
     await waitFor(() => {
-      expect(screen.getByTestId('tvguide-panel')).toBeInTheDocument();
+      debugIfFail(() => expect(screen.getByTestId('tvguide-panel')).toBeInTheDocument(), "TVGuide panel present after channel query");
     });
-    // Insights panel title is present
-    expect(screen.getByTestId('insights-panel')).toBeInTheDocument();
-    // At least one guide result row (wait for async dom)
+    debugIfFail(() => expect(screen.getByTestId('insights-panel')).toBeInTheDocument(), "Insights panel present after channel query");
     await waitFor(() => {
-      expect(screen.getByTestId('guide-results-section').textContent).not.toMatch(/Searching…/);
+      // Wait for results to finish loading
+      debugIfFail(() =>
+        expect(screen.getByTestId('guide-results-section').textContent).not.toMatch(/Searching…/),
+        "Guide results should not be in loading state"
+      );
     });
-    // At least one insight row (wait for content)
-    expect(screen.queryByTestId('insights-content-list')).toBeTruthy();
+    debugIfFail(() => expect(screen.queryByTestId('insights-content-list')).toBeTruthy(), "Insights result present after channel query");
   });
 });
 
