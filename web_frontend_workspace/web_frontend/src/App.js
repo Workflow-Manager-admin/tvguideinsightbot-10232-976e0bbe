@@ -423,7 +423,8 @@ function TVGuidePanel({ guideData, loading, onSearch }) {
   const [query, setQuery] = useState("");
   const [searchStarted, setSearchStarted] = useState(false);
 
-  // Reset searchStarted when results returned, so loading indicator and buttons update immediately
+  // Immediately set searchStarted true at async start so loading state and disables happen synchronously
+  // Ensure that when loading prop becomes false, clear searchStarted to return to normal/UI ready state
   useEffect(() => {
     if (!loading) setSearchStarted(false);
   }, [loading]);
@@ -432,9 +433,9 @@ function TVGuidePanel({ guideData, loading, onSearch }) {
   function handleSearch(e) {
     e.preventDefault();
     const trimmedQuery = query.trim();
-    if (trimmedQuery && !loading) {
-      setSearchStarted(true);
-      setTimeout(() => {}, 0); // Force sync flush for test/disabled
+    if (trimmedQuery && !loading && !searchStarted) {
+      setSearchStarted(true); // synchronously: UI disables/buttons and loading show update
+      setTimeout(() => {}, 0);
       Promise.resolve(onSearch(trimmedQuery)).finally(() => {});
     }
   }
@@ -444,54 +445,55 @@ function TVGuidePanel({ guideData, loading, onSearch }) {
     if (e.key === "Enter" && !e.shiftKey) handleSearch(e);
   }
 
+  // Key UI panels for testid
   let showState = null;
   if (loading || searchStarted) {
     showState = (
-      <div data-testid="guide-loading" style={{ color: COLORS.primary, textAlign: "center", marginTop: "30px" }}>
+      <div data-testid="guide-loading-indicator" style={{ color: COLORS.primary, textAlign: "center", marginTop: "30px" }}>
         Searching…
       </div>
     );
   } else if (Array.isArray(guideData) && guideData.length > 0) {
     showState = (
-      <>
+      <div data-testid="guide-content-list">
         {guideData.map((item, i) => (
           <div className="guide-row" key={item.id || i} data-testid="guide-result-row">
             <div>
-              <div className="guide-show-title" data-testid="guide-result-title">{item.title}</div>
-              <div className="guide-channel" data-testid="guide-result-channel">{item.channel || "—"}</div>
-              <div className="guide-time" data-testid="guide-result-time">
+              <div className="guide-show-title" data-testid={`guide-result-title-${i}`}>{item.title}</div>
+              <div className="guide-channel" data-testid={`guide-result-channel-${i}`}>{item.channel || "—"}</div>
+              <div className="guide-time" data-testid={`guide-result-time-${i}`}>
                 {item.start}-{item.end}
               </div>
               <div
-                data-testid="guide-result-description"
+                data-testid={`guide-result-description-${i}`}
                 style={{
                   color: "#888", fontSize: ".93em", marginTop: "2px"
                 }}>{item.description}</div>
             </div>
           </div>
         ))}
-      </>
+      </div>
     );
   } else if (Array.isArray(guideData) && guideData.length === 0) {
     showState = (
-      <div data-testid="guide-empty" style={{ color: "#888", marginTop: "20px" }}>
+      <div data-testid="guide-empty-state" style={{ color: "#888", marginTop: "20px" }}>
         No results found.
       </div>
     );
   } else {
     showState = (
-      <div data-testid="guide-prompt" style={{ color: "#888", marginTop: "20px" }}>
+      <div data-testid="guide-initial-prompt" style={{ color: "#888", marginTop: "20px" }}>
         Search by show, channel or genre...
       </div>
     );
   }
 
-  // Button disables immediately on loading or queued search and if blank
+  // Button disables immediately on loading, searchStarted, or blank
   const disableSearch = loading || searchStarted || !query.trim();
 
   return (
-    <div className="tg-panel tg-guide">
-      <div className="guide-header">
+    <div className="tg-panel tg-guide" data-testid="tvguide-panel">
+      <div className="guide-header" data-testid="guide-header">
         <span>TV Guide</span>
         <span role="img" aria-label="tv">📺</span>
       </div>
@@ -519,6 +521,7 @@ function TVGuidePanel({ guideData, loading, onSearch }) {
           }}
           type="submit"
           disabled={disableSearch}
+          aria-busy={disableSearch}
           data-testid="guide-search-btn"
         >
           Search
@@ -538,37 +541,40 @@ function TVGuidePanel({ guideData, loading, onSearch }) {
  */
 function InsightsPanel({ insights, loading }) {
   let content = null;
-
+  // Ensure all major UI states have robust test selection and unique test id
   if (loading) {
     content = (
-      <div className="graph-loading" data-testid="insights-loading">
+      <div className="graph-loading" data-testid="insights-loading-indicator">
         Loading insights graph…
       </div>
     );
   } else if (Array.isArray(insights) && insights.length > 0) {
     content = (
-      <>
+      <div data-testid="insights-content-list">
         {insights.map((ins, idx) => (
-          <div className="graph-item" key={idx} data-testid="insights-result-row">
-            <div className="graph-item-title" data-testid="insights-result-title">{ins.title}</div>
-            <div style={{ color: "#333", fontSize: "0.97em", marginTop: 3 }} data-testid="insights-result-detail">{ins.detail}</div>
+          <div className="graph-item" key={idx} data-testid={`insights-result-row-${idx}`}>
+            <div className="graph-item-title" data-testid={`insights-result-title-${idx}`}>{ins.title}</div>
+            <div
+              style={{ color: "#333", fontSize: "0.97em", marginTop: 3 }}
+              data-testid={`insights-result-detail-${idx}`}
+            >{ins.detail}</div>
           </div>
         ))}
-      </>
+      </div>
     );
   } else {
     content = (
-      <span style={{ color: "#888" }} data-testid="insights-empty">
+      <div style={{ color: "#888" }} data-testid="insights-empty-state">
         No insights available.
         <br />
         Interact with the chatbot for TV trivia and links!
-      </span>
+      </div>
     );
   }
 
   return (
     <aside className="tg-graph" data-testid="insights-panel">
-      <div className="graph-header">
+      <div className="graph-header" data-testid="insights-header">
         <span>Knowledge Graph Insights</span>
         <span role="img" aria-label="graph">🧠</span>
       </div>
