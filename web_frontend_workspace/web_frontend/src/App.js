@@ -4,25 +4,36 @@ import ChatbotUI from "./components/ChatbotUI";
 import TVGuidePanel from "./components/TVGuidePanel";
 import KnowledgeGraphSidePanel from "./components/KnowledgeGraphSidePanel";
 import { sendMessage } from "./services/chatbotService";
-import { fetchTVGuide, fetchKnowledgeGraph } from "./services/tvGuideService";
 
+/**
+ * App - Main UI component composing chatbot, TV Guide, and Knowledge Graph insight side panel.
+ * Handles state sharing between panels and ensures a responsive, modern layout.
+ */
 function App() {
+  // Theme
   const [theme, setTheme] = useState("light");
+
+  // Chat related state
   const [messages, setMessages] = useState([
-    { sender: "bot", text: "Welcome to TVGuideBot! Ask me about TV schedules, trending shows, or actors." },
+    {
+      sender: "bot",
+      text: "Welcome to TVGuideBot! Ask me about TV schedules, trending shows, or actors.",
+    },
   ]);
   const [chatLoading, setChatLoading] = useState(false);
 
-  // TV Guide and Knowledge Graph (stub state)
+  // TV Guide data state
   const [guideResults, setGuideResults] = useState([]);
-  const [guideLoading, setGuideLoading] = useState(false);
-  const [guideError, setGuideError] = useState("");
+  const [guideLoading] = useState(false); // TVGuidePanel loading stub (expand if fetching TV Guide directly)
+  const [guideError] = useState(""); // TVGuidePanel error stub
+
+  // Knowledge Graph insights state
   const [kgInsights, setKGInsights] = useState([]);
-  const [kgLoading, setKGLoading] = useState(false);
-  const [kgError, setKGError] = useState("");
+  const [kgLoading] = useState(false); // Knowledge graph loading stub (expand if fetching directly)
+  const [kgError] = useState(""); // Knowledge Graph error stub
   const [kgPanelActive, setKGPanelActive] = useState(false);
 
-  // Effect to apply theme to document element
+  // Apply chosen theme to root
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
@@ -35,15 +46,13 @@ function App() {
     setMessages((msgs) => [...msgs, { sender: "user", text: userInput }]);
     setChatLoading(true);
     try {
-      // Example: Send user message to API and get bot reply, guide matches, and insights.
+      // Send user input, receive bot reply and (optionally) TV guide/insight data.
       const resp = await sendMessage(userInput);
-      // resp: { reply, guideResults, kgInsights }
+      // resp = { reply, guideResults, kgInsights }
       if (resp.reply)
         setMessages((msgs) => [...msgs, { sender: "bot", text: resp.reply }]);
       if (resp.guideResults) setGuideResults(resp.guideResults);
       if (resp.kgInsights) setKGInsights(resp.kgInsights);
-      setGuideError("");
-      setKGError("");
       setKGPanelActive(!!resp.kgInsights && resp.kgInsights.length > 0);
     } catch (e) {
       setMessages((msgs) => [
@@ -55,6 +64,7 @@ function App() {
     }
   };
 
+  // Responsive flexbox layout: Main column, TV/chat left, graph panel right (collapsible)
   return (
     <div className="App">
       <button
@@ -64,23 +74,37 @@ function App() {
       >
         {theme === "light" ? "🌙 Dark" : "☀️ Light"}
       </button>
-      <h1 className="title" style={{ marginBottom: 6, marginTop: 16 }}>TVGuideChatBot</h1>
+      <h1 className="title" style={{ marginBottom: 6, marginTop: 16 }}>
+        TVGuideChatBot
+      </h1>
       <p className="subtitle" style={{ color: "var(--text-secondary)", margin: 0 }}>
         Your smart assistant for TV schedules, shows, and graph-powered recommendations!
       </p>
-      <div style={{
-        display: "flex",
-        width: "100%",
-        marginTop: 18,
-        alignItems: "stretch",
-        justifyContent: "center"
-      }}>
-        <div style={{
-          flex: "2 1 520px",
-          maxWidth: 670,
-          marginLeft: 0,
-          marginRight: 24
-        }}>
+      {/* Main layout row: TV Guide/chat (left), KG panel (right, collapsible on small screens) */}
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          width: "100%",
+          marginTop: 18,
+          alignItems: "stretch",
+          justifyContent: "center",
+          minHeight: 420,
+        }}
+      >
+        {/* Main panels column */}
+        <div
+          style={{
+            flex: "2 1 480px",
+            maxWidth: 670,
+            minWidth: 0,
+            marginLeft: 0,
+            marginRight: 24,
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+          }}
+        >
           <ChatbotUI
             onSendMessage={handleSendMessage}
             messages={messages}
@@ -92,6 +116,7 @@ function App() {
             error={guideError}
           />
         </div>
+        {/* KnowledgeGraph Side Panel */}
         <KnowledgeGraphSidePanel
           insights={kgInsights}
           loading={kgLoading}
@@ -99,11 +124,13 @@ function App() {
           active={kgPanelActive}
         />
       </div>
-      <footer style={{
-        marginTop: 36,
-        color: "var(--text-secondary)",
-        fontSize: "0.96rem"
-      }}>
+      <footer
+        style={{
+          marginTop: 36,
+          color: "var(--text-secondary)",
+          fontSize: "0.96rem",
+        }}
+      >
         &copy; {new Date().getFullYear()} TVGuideChatBot &middot; Powered by Gracenote and KG
       </footer>
     </div>
