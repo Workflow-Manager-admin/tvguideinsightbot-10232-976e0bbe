@@ -1,0 +1,63 @@
+.tv-guide-panel {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-radius: 11px;
+  margin: 0 0 18px 0;
+  padding: 18px 15px;
+  box-shadow: 0 1px 6px 0 rgba(32,32,40,0.06);
+}
+
+.tv-guide-panel h3 {
+  margin: 0 0 10px 0;
+  font-weight: 700;
+  font-size: 1.18rem;
+}
+
+.guide-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tv-show-card {
+  background: var(--bg-primary);
+  border-radius: 8px;
+  padding: 12px;
+  mix-blend-mode: normal;
+  box-shadow: 0 1px 3px 0 rgba(32,32,40,0.07);
+  border: 1px solid var(--border-color);
+}
+
+.show-title {
+  font-size: 1.07rem;
+  font-weight: 600;
+  margin: 0 0 2px 0;
+}
+
+.show-details {
+  font-size: 0.98rem;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  display: flex;
+  gap: 16px;
+}
+
+.show-description {
+  color: var(--text-primary);
+  font-size: 0.93rem;
+}
+
+.tv-guide-panel.loading,
+.tv-guide-panel.empty,
+.tv-guide-panel.error {
+  color: var(--text-secondary);
+  padding: 24px 0;
+  text-align: center;
+}
+
+@media (max-width: 600px) {
+  .tv-guide-panel {
+    padding: 8px 4px;
+    border-radius: 0;
+  }
+}
