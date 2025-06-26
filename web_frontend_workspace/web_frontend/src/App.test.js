@@ -2,8 +2,14 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import App from './App';
 
+/**
+ * Helper to flush pending promises in test environments.
+ * Uses setTimeout 0 for maximum compatibility instead of setImmediate.
+ */
+import { act } from '@testing-library/react';
 // For API mocks
-const flushPromises = () => new Promise(setImmediate);
+const flushPromises = () =>
+  act(() => new Promise(resolve => setTimeout(resolve, 0)));
 
 describe('TVGuideChatBot App', () => {
   beforeEach(() => {
@@ -95,7 +101,10 @@ describe('TVGuideChatBot App', () => {
     expect(await screen.findByText(/Searching…/)).toBeInTheDocument();
 
     // Faking delay for fetchTVGuide mock ~1s (setTimeout stubbed)
-    await act(async () => { jest.advanceTimersByTime(1050); await flushPromises(); });
+    await act(async () => {
+      jest.advanceTimersByTime(1050);
+      await flushPromises();
+    });
 
     // Guide shows results
     expect(await screen.findAllByText(/Great Cake Bake-off/i)).toHaveLength(1);
@@ -117,7 +126,10 @@ describe('TVGuideChatBot App', () => {
     fireEvent.click(searchBtn);
 
     // Wait for API to resolve and check empty state
-    await act(async () => { jest.advanceTimersByTime(1050); await flushPromises(); });
+    await act(async () => {
+      jest.advanceTimersByTime(1050);
+      await flushPromises();
+    });
     // Should show the specific "No results found." label
     expect(screen.getByText(/No results found/i)).toBeInTheDocument();
   });
@@ -132,7 +144,10 @@ describe('TVGuideChatBot App', () => {
     // Loading label appears in insights
     expect(await screen.findByText(/Loading insights graph/i)).toBeInTheDocument();
 
-    await act(async () => { jest.advanceTimersByTime(1050); await flushPromises(); });
+    await act(async () => {
+      jest.advanceTimersByTime(1050);
+      await flushPromises();
+    });
 
     // After API calls, insights appear
     expect(
@@ -160,7 +175,10 @@ describe('TVGuideChatBot App', () => {
     expect(sendBtn).not.toBeDisabled();
     fireEvent.click(sendBtn);
     expect(sendBtn).toBeDisabled(); // Bot loading disables send
-    await act(async () => { jest.advanceTimersByTime(1050); await flushPromises(); });
+    await act(async () => {
+      jest.advanceTimersByTime(1050);
+      await flushPromises();
+    });
   });
 
   test('ChatbotPanel disables send button when input is empty or whitespace', () => {
@@ -195,7 +213,10 @@ describe('TVGuideChatBot App', () => {
     ).toBeInTheDocument();
 
     // Guide and insights should be triggered for this
-    await act(async () => { jest.advanceTimersByTime(2050); await flushPromises(); });
+    await act(async () => {
+      jest.advanceTimersByTime(2050);
+      await flushPromises();
+    });
 
     // The mock API will provide results appropriately
     expect(screen.getByText(/Bake-off/i)).toBeInTheDocument();
