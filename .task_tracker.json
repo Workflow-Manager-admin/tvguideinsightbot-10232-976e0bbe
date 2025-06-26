@@ -1,0 +1,5 @@
+{
+  "task_description": "{'description': 'Create a TVGuideChatBot app using Gracenote APIs and a Knowledge Graph from Neo4j.', 'containers': [{'container_name': 'web_frontend', 'platform': 'web', 'framework': 'react', 'description': 'User-facing web application that provides a chat interface for the TVGuideChatBot.', 'interfaces': 'Web UI for user interaction with the chatbot', 'workspace': 'web_frontend_workspace', 'container_root': 'web_frontend_workspace/web_frontend', 'dependencies': [], 'container_type': 'frontend', 'container_details': {'features': ['chatbot user interface', 'TV guide search and display', 'integration with Gracenote APIs', 'display knowledge graph insights from Neo4j'], 'colors': {'primary': '#1976D2', 'secondary': '#424242', 'accent': '#FFC107'}, 'theme': 'auto', 'layout_description': 'Responsive layout with a chat window, TV guide pane, and dynamic side panel for knowledge graph insights.', 'style': 'modern'}}], '3rd_party_services': [], 'figma_components': '', 'manifest_path': '/home/kavia/workspace/code-generation/.project_manifest.yaml'}",
+  "tasks": {},
+  "next_task_id": 1
+}
