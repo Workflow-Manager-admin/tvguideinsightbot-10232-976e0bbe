@@ -2,6 +2,10 @@
 // allows you to do things like:
 // expect(element).toHaveTextContent(/react/i)
 // learn more: https://github.com/testing-library/jest-dom
+if (typeof setImmediate === 'undefined') {
+  // Polyfill setImmediate using setTimeout for environments like jsdom/Jest that lack it
+  global.setImmediate = (fn, ...args) => setTimeout(fn, 0, ...args);
+}
 import '@testing-library/jest-dom';
 
 // Mock scrollIntoView (jsdom does not implement it)
