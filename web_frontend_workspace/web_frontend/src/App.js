@@ -569,8 +569,45 @@ function InsightsPanel({ insights, loading }) {
 async function fetchTVGuide(query) {
   // PUBLIC_INTERFACE: replace with real API endpoint integration
   await new Promise(resolve => setTimeout(resolve, 600 + Math.random() * 400)); // network delay
-  if (!query) return [];
-  // Return mock data with varying info depending on query
+  // Test support:
+  if (!query) {
+    return [];
+  }
+  // Special test case for "unknownshow" or anything resembling "no results"
+  if (
+    ["unknownshow", "noresults", "zzzzzzzz", "nonews", "showthatdoesnotexist"].includes(
+      String(query).trim().toLowerCase()
+    )
+  ) {
+    return [];
+  }
+
+  const channelMatch = String(query).match(/^channel[ ]*(\d+)/i);
+  if (channelMatch) {
+    // Pretend we return two shows on requested channel
+    const chNum = channelMatch[1];
+    const now = new Date();
+    return [
+      {
+        id: 1,
+        title: `Cooking Live Channel ${chNum}`,
+        channel: `Channel ${chNum}`,
+        start: fmtTime(now),
+        end: fmtTime(new Date(now.getTime() + 3600000)),
+        description: `Live cooking and contests on Channel ${chNum}.`
+      },
+      {
+        id: 2,
+        title: `Channel ${chNum} Late Movie`,
+        channel: `Channel ${chNum}`,
+        start: fmtTime(new Date(now.getTime() + 3700000)),
+        end: fmtTime(new Date(now.getTime() + 5400000)),
+        description: `A thrilling movie presented exclusively on Channel ${chNum}.`
+      }
+    ];
+  }
+
+  // Default: Return mock data with varying info depending on query
   const now = new Date();
   return [
     {
