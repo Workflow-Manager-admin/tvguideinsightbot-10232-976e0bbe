@@ -312,20 +312,32 @@ const injectCustomTheme = () => {
 // Chatbot user interface
 
 // PUBLIC_INTERFACE
+/**
+ * ChatbotPanel renders the chatbot interface, robustly handling:
+ * - loading: disables send button and renders "…" for bot reply
+ * - input: disables send button on blank/whitespace or during async reply
+ * - loading state is visible as text "…" reliably for testing
+ */
 function ChatbotPanel({ messages, onSend, loading }) {
   const [input, setInput] = useState("");
+  const [internalLoading, setInternalLoading] = useState(loading);
   const messagesEndRef = useRef();
 
-  // Scroll to bottom on new message
+  useEffect(() => {
+    setInternalLoading(loading);
+  }, [loading]);
+  // Scroll to bottom on new message or loading
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
+  }, [messages, loading, internalLoading]);
 
   // PUBLIC_INTERFACE
   function handleSend(e) {
     e.preventDefault();
-    if (input.trim()) {
-      onSend(input.trim());
+    if (input.trim() && !internalLoading) {
+      setInternalLoading(true);
+      Promise.resolve(onSend(input.trim()))
+        .finally(() => setInternalLoading(false));
       setInput("");
     }
   }
@@ -334,6 +346,9 @@ function ChatbotPanel({ messages, onSend, loading }) {
   function handleInputKey(e) {
     if (e.key === "Enter" && !e.shiftKey) handleSend(e);
   }
+
+  // Disable button on loading, or blank/whitespace-only
+  const sendDisabled = input.trim().length === 0 || internalLoading;
 
   return (
     <div className="tg-panel tg-chatbot">
@@ -352,8 +367,8 @@ function ChatbotPanel({ messages, onSend, loading }) {
             {msg.role === "user" && <span className="user-label">You</span>}
           </div>
         ))}
-        {loading && (
-          <div className="message message-bot">
+        {internalLoading && (
+          <div className="message message-bot" data-testid="chatbot-loading">
             <span className="chatbot-label">Bot</span>
             <span className="msg-bubble" style={{ opacity: 0.65 }}>…</span>
           </div>
@@ -369,12 +384,13 @@ function ChatbotPanel({ messages, onSend, loading }) {
           onKeyDown={handleInputKey}
           placeholder="Ask me about shows, TV guides, or insights…"
           aria-label="Message input"
+          disabled={internalLoading}
         />
         <button
           className="chat-send-btn"
           type="submit"
           aria-label="Send"
-          disabled={input.trim().length === 0 || loading}
+          disabled={sendDisabled}
         >
           Send
         </button>
@@ -386,19 +402,75 @@ function ChatbotPanel({ messages, onSend, loading }) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TV Guide Panel with search and (mock) integration to Gracenote API
 
-// PUBLIC_INTERFACE
+/**
+ * PUBLIC_INTERFACE
+ * TVGuidePanel renders the TV Guide search and results, reliably rendering all UI states:
+ * - loading: "Searching…"
+ * - empty: "No results found." or initial prompt
+ * - disables Search button as appropriate
+ *
+ * The text nodes are adjusted for robust test queries.
+ */
 function TVGuidePanel({ guideData, loading, onSearch }) {
   const [query, setQuery] = useState("");
+  const [internalLoading, setInternalLoading] = useState(false);
+
+  useEffect(() => {
+    setInternalLoading(loading);
+  }, [loading]);
 
   // PUBLIC_INTERFACE
   function handleSearch(e) {
     e.preventDefault();
-    onSearch(query.trim());
+    if (query.trim() && !internalLoading) {
+      setInternalLoading(true);
+      Promise.resolve(onSearch(query.trim())).finally(() => setInternalLoading(false));
+    }
   }
 
   // PUBLIC_INTERFACE
   function handleInputKey(e) {
     if (e.key === "Enter" && !e.shiftKey) handleSearch(e);
+  }
+
+  let showState = null;
+  if (internalLoading) {
+    showState = (
+      <div data-testid="guide-loading" style={{ color: COLORS.primary, textAlign: "center", marginTop: "30px" }}>
+        Searching…
+      </div>
+    );
+  } else if (Array.isArray(guideData) && guideData.length > 0) {
+    showState = (
+      <>
+        {guideData.map((item, i) => (
+          <div className="guide-row" key={item.id || i}>
+            <div>
+              <div className="guide-show-title">{item.title}</div>
+              <div className="guide-channel">{item.channel || "—"}</div>
+              <div className="guide-time">
+                {item.start}-{item.end}
+              </div>
+              <div style={{
+                color: "#888", fontSize: ".93em", marginTop: "2px"
+              }}>{item.description}</div>
+            </div>
+          </div>
+        ))}
+      </>
+    );
+  } else if (Array.isArray(guideData) && guideData.length === 0) {
+    showState = (
+      <div data-testid="guide-empty" style={{ color: "#888", marginTop: "20px" }}>
+        No results found.
+      </div>
+    );
+  } else {
+    showState = (
+      <div data-testid="guide-prompt" style={{ color: "#888", marginTop: "20px" }}>
+        Search by show, channel or genre...
+      </div>
+    );
   }
 
   return (
@@ -416,6 +488,7 @@ function TVGuidePanel({ guideData, loading, onSearch }) {
           maxLength={100}
           placeholder="Search shows, channels…"
           aria-label="TV Guide Search"
+          disabled={internalLoading}
         />
         <button
           style={{
@@ -425,40 +498,15 @@ function TVGuidePanel({ guideData, loading, onSearch }) {
             borderRadius: "9px",
             padding: "8px 16px",
             fontWeight: "bold",
-            cursor: "pointer"
+            cursor: internalLoading ? "not-allowed" : "pointer"
           }}
           type="submit"
-          disabled={loading || !query.trim()}
+          disabled={internalLoading || !query.trim()}
         >
           Search
         </button>
       </form>
-      <div className="guide-results">
-        {loading ? (
-          <div style={{ color: COLORS.primary, textAlign: "center", marginTop: "30px" }}>
-            Searching…
-          </div>
-        ) : guideData && guideData.length > 0 ? (
-          guideData.map((item, i) => (
-            <div className="guide-row" key={item.id || i}>
-              <div>
-                <div className="guide-show-title">{item.title}</div>
-                <div className="guide-channel">{item.channel || "—"}</div>
-                <div className="guide-time">
-                  {item.start}-{item.end}
-                </div>
-                <div style={{
-                  color: "#888", fontSize: ".93em", marginTop: "2px"
-                }}>{item.description}</div>
-              </div>
-            </div>
-          ))
-        ) : (
-          <div style={{ color: "#888", marginTop: "20px" }}>
-            {guideData ? "No results found." : "Search by show, channel or genre..."}
-          </div>
-        )}
-      </div>
+      <div className="guide-results">{showState}</div>
     </div>
   );
 }
@@ -467,26 +515,46 @@ function TVGuidePanel({ guideData, loading, onSearch }) {
 // Knowledge Insights Panel (Neo4j integration, mock for now)
 
 // PUBLIC_INTERFACE
+/**
+ * InsightsPanel robustly renders loading, empty, and result states for tests.
+ */
 function InsightsPanel({ insights, loading }) {
+  let content = null;
+
+  if (loading) {
+    content = (
+      <div className="graph-loading" data-testid="insights-loading">
+        Loading insights graph…
+      </div>
+    );
+  } else if (Array.isArray(insights) && insights.length > 0) {
+    content = (
+      <>
+        {insights.map((ins, idx) => (
+          <div className="graph-item" key={idx}>
+            <div className="graph-item-title">{ins.title}</div>
+            <div style={{ color: "#333", fontSize: "0.97em", marginTop: 3 }}>{ins.detail}</div>
+          </div>
+        ))}
+      </>
+    );
+  } else {
+    content = (
+      <span style={{ color: "#888" }} data-testid="insights-empty">
+        No insights available.
+        <br />
+        Interact with the chatbot for TV trivia and links!
+      </span>
+    );
+  }
+
   return (
     <aside className="tg-graph">
       <div className="graph-header">
         <span>Knowledge Graph Insights</span>
         <span role="img" aria-label="graph">🧠</span>
       </div>
-      <div className="graph-body">
-        {loading
-          ? <div className="graph-loading">Loading insights graph…</div>
-          : insights && insights.length > 0
-            ? insights.map((ins, idx) => (
-                <div className="graph-item" key={idx}>
-                  <div className="graph-item-title">{ins.title}</div>
-                  <div style={{ color: "#333", fontSize: "0.97em", marginTop: 3 }}>{ins.detail}</div>
-                </div>
-              ))
-            : <span style={{ color: "#888" }}>No insights available.<br />Interact with the chatbot for TV trivia and links!</span>
-        }
-      </div>
+      <div className="graph-body">{content}</div>
     </aside>
   );
 }
