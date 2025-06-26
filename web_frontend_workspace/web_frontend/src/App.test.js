@@ -7,8 +7,18 @@ import App from './App';
  * Uses setTimeout(0) for maximum compatibility.
  * Always wrap async actions/state updates in act(), or use user-event async utilities/waitFor as appropriate.
  */
+/**
+ * Utility: Forces all pending timers (setTimeout, setInterval) to run instantly.
+ * Use in conjunction with jest.useFakeTimers() for deterministic tests.
+ */
 const flushPromises = () =>
-  act(() => new Promise(resolve => setTimeout(resolve, 0)));
+  act(() =>
+    new Promise(resolve => {
+      // Run pending timers before resolving Promise, so code after timeouts can complete
+      jest.runOnlyPendingTimers();
+      setImmediate(resolve);
+    })
+  );
 
 describe('TVGuideChatBot App', () => {
   // Increase default Jest timeout for slow async flows
