@@ -44,12 +44,17 @@ describe('TVGuideChatBot App', () => {
     jest.useRealTimers();
   });
 
-  // Utility: Render App in a test - always within act for safety
-  const setup = () =>
-    act(() => { render(<App />); });
+    // Utility: Render App in a test - always within act for safety
+  const setup = async () => {
+    await act(async () => {
+      render(<App />);
+      // Ensure all async effects after mount are flushed
+      await flushPromises();
+    });
+  };
 
-  test('renders initial chatbot greeting and panel layout', () => {
-    setup();
+  test('renders initial chatbot greeting and panel layout', async () => {
+    await setup();
     expect(screen.getByText("TVGuideChatBot")).toBeInTheDocument();
     expect(screen.getByLabelText(/Message input/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/TV Guide Search/i)).toBeInTheDocument();
@@ -60,12 +65,13 @@ describe('TVGuideChatBot App', () => {
     ).toBeInTheDocument();
   });
 
-  test('theme toggle switches theme and button text', () => {
-    setup();
+  test('theme toggle switches theme and button text', async () => {
+    await setup();
     const toggle = screen.getByRole('button', { name: /switch to dark mode/i });
     expect(toggle).toBeInTheDocument();
-    act(() => {
+    await act(async () => {
       fireEvent.click(toggle);
+      await flushPromises();
     });
     expect(
       screen.getByRole('button', { name: /switch to light mode/i })
@@ -73,7 +79,7 @@ describe('TVGuideChatBot App', () => {
   });
 
   test('chatbot allows user messaging, disables on loading, and bot responds', async () => {
-    setup();
+    await setup();
     const input = screen.getByLabelText(/Message input/i);
     const sendBtn = screen.getByRole('button', { name: /send/i });
 
@@ -81,9 +87,9 @@ describe('TVGuideChatBot App', () => {
     expect(input.value).toBe('');
     expect(sendBtn).toBeDisabled();
 
-    // Type a message
-    act(() => {
+    await act(async () => {
       fireEvent.change(input, { target: { value: 'What\'s on tonight?' } });
+      await flushPromises();
     });
     expect(input.value).toBe('What\'s on tonight?');
     expect(sendBtn).not.toBeDisabled();
@@ -91,6 +97,7 @@ describe('TVGuideChatBot App', () => {
     // Send message (should disable button and show loading)
     await act(async () => {
       fireEvent.click(sendBtn);
+      await flushPromises();
     });
 
     // Message appears as "You" (wait for user message bubble)
@@ -102,7 +109,7 @@ describe('TVGuideChatBot App', () => {
 
     // Advance timers and flush async effects for fake bot response
     await act(async () => {
-      jest.advanceTimersByTime(1100); // long enough for minimum bot response
+      jest.runOnlyPendingTimers();
       await flushPromises();
     });
 
@@ -111,7 +118,7 @@ describe('TVGuideChatBot App', () => {
   });
 
   test('TVGuidePanel search: input, search button, loading and no results states', async () => {
-    setup();
+    await setup();
     const guideInput = screen.getByLabelText(/TV Guide Search/i);
     const searchBtn = screen.getByRole('button', { name: /^Search$/ });
 
@@ -119,23 +126,24 @@ describe('TVGuideChatBot App', () => {
     expect(guideInput.value).toBe('');
     expect(searchBtn).toBeDisabled();
 
-    // Enter a query
-    act(() => {
+    await act(async () => {
       fireEvent.change(guideInput, { target: { value: 'cake' } });
+      await flushPromises();
     });
     expect(searchBtn).not.toBeDisabled();
 
     // Start search
     await act(async () => {
       fireEvent.click(searchBtn);
+      await flushPromises();
     });
 
     // Loading label appears
     expect(await screen.findByText(/Searching…/)).toBeInTheDocument();
 
-    // Faking delay for fetchTVGuide mock ~1s (setTimeout stubbed)
+    // Faking delay for fetchTVGuide mock - flush all timers/microtasks
     await act(async () => {
-      jest.advanceTimersByTime(1100);
+      jest.runOnlyPendingTimers();
       await flushPromises();
     });
 
@@ -150,21 +158,23 @@ describe('TVGuideChatBot App', () => {
   });
 
   test('TVGuidePanel shows "No results found." if guideData is empty', async () => {
-    setup();
+    await setup();
     // Simulate a search with empty guide data
     const guideInput = screen.getByLabelText(/TV Guide Search/i);
     const searchBtn = screen.getByRole('button', { name: /^Search$/ });
 
-    act(() => {
+    await act(async () => {
       fireEvent.change(guideInput, { target: { value: 'unknownshow' } });
+      await flushPromises();
     });
     await act(async () => {
       fireEvent.click(searchBtn);
+      await flushPromises();
     });
 
     // Wait for mock API delay and flush timers/promises
     await act(async () => {
-      jest.advanceTimersByTime(1100);
+      jest.runOnlyPendingTimers();
       await flushPromises();
     });
     // Should show the "No results found." label
@@ -172,14 +182,16 @@ describe('TVGuideChatBot App', () => {
   });
 
   test('InsightsPanel displays loading and result states', async () => {
-    setup();
+    await setup();
     // Trigger a chatbot message that matches "insight" intent
     const input = screen.getByLabelText(/Message input/i);
-    act(() => {
+    await act(async () => {
       fireEvent.change(input, { target: { value: 'Give an insight' } });
+      await flushPromises();
     });
     await act(async () => {
       fireEvent.keyDown(input, { key: 'Enter', code: 13 });
+      await flushPromises();
     });
 
     // Loading label appears while fetching insights
@@ -187,7 +199,7 @@ describe('TVGuideChatBot App', () => {
 
     // Advance fake timers and flush async for mock insights response
     await act(async () => {
-      jest.advanceTimersByTime(1200); // longer than max mock delay
+      jest.runOnlyPendingTimers();
       await flushPromises();
     });
 
@@ -197,63 +209,72 @@ describe('TVGuideChatBot App', () => {
     expect(screen.getByText(/Related Shows/i)).toBeInTheDocument();
   });
 
-  test('InsightsPanel displays empty state before interaction', () => {
-    setup();
+  test('InsightsPanel displays empty state before interaction', async () => {
+    await setup();
     // Before any search or message, it shows empty state message
     expect(screen.getByText(/No insights available/i)).toBeInTheDocument();
   });
 
   test('Button disables and re-enables correctly on bot loading', async () => {
-    setup();
+    await setup();
     const input = screen.getByLabelText(/Message input/i);
     const sendBtn = screen.getByRole('button', { name: /send/i });
-    act(() => {
+    await act(async () => {
       fireEvent.change(input, { target: { value: 'guide' } });
+      await flushPromises();
     });
     expect(sendBtn).not.toBeDisabled();
     await act(async () => {
       fireEvent.click(sendBtn);
+      await flushPromises();
       // Immediately after click, bot loading disables send
       expect(sendBtn).toBeDisabled();
-      jest.advanceTimersByTime(1050);
+      jest.runOnlyPendingTimers();
       await flushPromises();
     });
+    // After bot loading, should be re-enabled; ensure stabilization
+    await waitFor(() => expect(sendBtn).not.toBeDisabled());
   });
 
-  test('ChatbotPanel disables send button when input is empty or whitespace', () => {
-    setup();
+  test('ChatbotPanel disables send button when input is empty or whitespace', async () => {
+    await setup();
     const input = screen.getByLabelText(/Message input/i);
     const sendBtn = screen.getByRole('button', { name: /send/i });
     expect(sendBtn).toBeDisabled();
-    act(() => {
+    await act(async () => {
       fireEvent.change(input, { target: { value: '   ' } });
+      await flushPromises();
     });
     expect(sendBtn).toBeDisabled();
-    act(() => {
+    await act(async () => {
       fireEvent.change(input, { target: { value: 'Show me trivia!' } });
+      await flushPromises();
     });
     expect(sendBtn).not.toBeDisabled();
   });
 
-  test('TVGuidePanel disables search button on loading', () => {
-    setup();
+  test('TVGuidePanel disables search button on loading', async () => {
+    await setup();
     const guideInput = screen.getByLabelText(/TV Guide Search/i);
     const searchBtn = screen.getByRole('button', { name: /^Search$/ });
-    act(() => {
+    await act(async () => {
       fireEvent.change(guideInput, { target: { value: 'abc' } });
       fireEvent.click(searchBtn);
+      await flushPromises();
     });
     expect(searchBtn).toBeDisabled();
   });
 
   test('Handles chat "channel" intent, triggers guide and insight logic', async () => {
-    setup();
+    await setup();
     const input = screen.getByLabelText(/Message input/i);
-    act(() => {
+    await act(async () => {
       fireEvent.change(input, { target: { value: 'Channel 12 shows' } });
+      await flushPromises();
     });
     await act(async () => {
       fireEvent.keyDown(input, { key: 'Enter', code: 13 });
+      await flushPromises();
     });
 
     // Bot message should relate to channel, after async state update
@@ -263,7 +284,7 @@ describe('TVGuideChatBot App', () => {
 
     // Wait for both guide and insight async calls to finish: advance enough time, flush microtasks/mocks
     await act(async () => {
-      jest.advanceTimersByTime(2200); // plenty to cover bot + guide + insight timers
+      jest.runOnlyPendingTimers();
       await flushPromises();
     });
 
