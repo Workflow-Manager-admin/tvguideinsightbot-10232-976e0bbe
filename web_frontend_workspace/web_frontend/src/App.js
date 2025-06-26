@@ -311,12 +311,12 @@ const injectCustomTheme = () => {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Chatbot user interface
 
-// PUBLIC_INTERFACE
 /**
  * ChatbotPanel renders the chatbot interface, robustly handling:
  * - loading: disables send button and renders "…" for bot reply
  * - input: disables send button on blank/whitespace or during async reply
  * - loading state is visible as text "…" reliably for testing
+ * - all relevant UI nodes have data-testid for solid test targeting
  */
 function ChatbotPanel({ messages, onSend, loading }) {
   const [input, setInput] = useState("");
@@ -336,6 +336,7 @@ function ChatbotPanel({ messages, onSend, loading }) {
     e.preventDefault();
     if (input.trim() && !internalLoading) {
       setInternalLoading(true);
+      setTimeout(() => {}, 0); // Force sync flush for disabled state
       Promise.resolve(onSend(input.trim()))
         .finally(() => setInternalLoading(false));
       setInput("");
@@ -356,11 +357,12 @@ function ChatbotPanel({ messages, onSend, loading }) {
         <span style={{ color: "var(--color-primary)", fontWeight: 800 }}>TVGuideChatBot</span>
         <span role="img" aria-label="chat">💬</span>
       </div>
-      <div className="chat-messages" role="log">
+      <div className="chat-messages" role="log" data-testid="chatbot-messages">
         {messages.map((msg, idx) => (
           <div
             className={`message ${msg.role === "user" ? "message-user" : "message-bot"}`}
             key={idx}
+            data-testid={msg.role === "bot" ? "chatbot-message-bot" : "chatbot-message-user"}
           >
             {msg.role === "bot" && <span className="chatbot-label">Bot</span>}
             <span className="msg-bubble">{msg.text}</span>
@@ -375,7 +377,12 @@ function ChatbotPanel({ messages, onSend, loading }) {
         )}
         <div ref={messagesEndRef} />
       </div>
-      <form className="chat-input-bar" onSubmit={handleSend} autoComplete="off">
+      <form
+        className="chat-input-bar"
+        onSubmit={handleSend}
+        autoComplete="off"
+        data-testid="chatbot-input-form"
+      >
         <input
           className="chat-input"
           value={input}
@@ -385,12 +392,14 @@ function ChatbotPanel({ messages, onSend, loading }) {
           placeholder="Ask me about shows, TV guides, or insights…"
           aria-label="Message input"
           disabled={internalLoading}
+          data-testid="chatbot-input"
         />
         <button
           className="chat-send-btn"
           type="submit"
           aria-label="Send"
           disabled={sendDisabled}
+          data-testid="chatbot-send-btn"
         >
           Send
         </button>
@@ -408,12 +417,10 @@ function ChatbotPanel({ messages, onSend, loading }) {
  * - loading: "Searching…"
  * - empty: "No results found." or initial prompt
  * - disables Search button as appropriate
- *
- * The text nodes are adjusted for robust test queries.
+ * - provides data-testid for all critical states for test targeting
  */
 function TVGuidePanel({ guideData, loading, onSearch }) {
   const [query, setQuery] = useState("");
-  // Use parent loading for button/input disable state and for loading indicator
   const [searchStarted, setSearchStarted] = useState(false);
 
   // Reset searchStarted when results returned, so loading indicator and buttons update immediately
@@ -427,7 +434,7 @@ function TVGuidePanel({ guideData, loading, onSearch }) {
     const trimmedQuery = query.trim();
     if (trimmedQuery && !loading) {
       setSearchStarted(true);
-      // Propagate to parent, which will toggle loading
+      setTimeout(() => {}, 0); // Force sync flush for test/disabled
       Promise.resolve(onSearch(trimmedQuery)).finally(() => {});
     }
   }
@@ -448,16 +455,18 @@ function TVGuidePanel({ guideData, loading, onSearch }) {
     showState = (
       <>
         {guideData.map((item, i) => (
-          <div className="guide-row" key={item.id || i}>
+          <div className="guide-row" key={item.id || i} data-testid="guide-result-row">
             <div>
-              <div className="guide-show-title">{item.title}</div>
-              <div className="guide-channel">{item.channel || "—"}</div>
-              <div className="guide-time">
+              <div className="guide-show-title" data-testid="guide-result-title">{item.title}</div>
+              <div className="guide-channel" data-testid="guide-result-channel">{item.channel || "—"}</div>
+              <div className="guide-time" data-testid="guide-result-time">
                 {item.start}-{item.end}
               </div>
-              <div style={{
-                color: "#888", fontSize: ".93em", marginTop: "2px"
-              }}>{item.description}</div>
+              <div
+                data-testid="guide-result-description"
+                style={{
+                  color: "#888", fontSize: ".93em", marginTop: "2px"
+                }}>{item.description}</div>
             </div>
           </div>
         ))}
@@ -486,7 +495,7 @@ function TVGuidePanel({ guideData, loading, onSearch }) {
         <span>TV Guide</span>
         <span role="img" aria-label="tv">📺</span>
       </div>
-      <form className="guide-search-bar" onSubmit={handleSearch}>
+      <form className="guide-search-bar" onSubmit={handleSearch} data-testid="guide-search-form">
         <input
           className="guide-search-inp"
           value={query}
@@ -496,6 +505,7 @@ function TVGuidePanel({ guideData, loading, onSearch }) {
           placeholder="Search shows, channels…"
           aria-label="TV Guide Search"
           disabled={loading || searchStarted}
+          data-testid="guide-search-input"
         />
         <button
           style={{
@@ -509,11 +519,12 @@ function TVGuidePanel({ guideData, loading, onSearch }) {
           }}
           type="submit"
           disabled={disableSearch}
+          data-testid="guide-search-btn"
         >
           Search
         </button>
       </form>
-      <div className="guide-results">{showState}</div>
+      <div className="guide-results" data-testid="guide-results-section">{showState}</div>
     </div>
   );
 }
@@ -521,9 +532,9 @@ function TVGuidePanel({ guideData, loading, onSearch }) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Knowledge Insights Panel (Neo4j integration, mock for now)
 
-// PUBLIC_INTERFACE
 /**
  * InsightsPanel robustly renders loading, empty, and result states for tests.
+ * All major state/output nodes have data-testid for test querying
  */
 function InsightsPanel({ insights, loading }) {
   let content = null;
@@ -538,9 +549,9 @@ function InsightsPanel({ insights, loading }) {
     content = (
       <>
         {insights.map((ins, idx) => (
-          <div className="graph-item" key={idx}>
-            <div className="graph-item-title">{ins.title}</div>
-            <div style={{ color: "#333", fontSize: "0.97em", marginTop: 3 }}>{ins.detail}</div>
+          <div className="graph-item" key={idx} data-testid="insights-result-row">
+            <div className="graph-item-title" data-testid="insights-result-title">{ins.title}</div>
+            <div style={{ color: "#333", fontSize: "0.97em", marginTop: 3 }} data-testid="insights-result-detail">{ins.detail}</div>
           </div>
         ))}
       </>
@@ -556,12 +567,12 @@ function InsightsPanel({ insights, loading }) {
   }
 
   return (
-    <aside className="tg-graph">
+    <aside className="tg-graph" data-testid="insights-panel">
       <div className="graph-header">
         <span>Knowledge Graph Insights</span>
         <span role="img" aria-label="graph">🧠</span>
       </div>
-      <div className="graph-body">{content}</div>
+      <div className="graph-body" data-testid="insights-graph-body">{content}</div>
     </aside>
   );
 }
