@@ -6,7 +6,6 @@ import App from './App';
  * Helper to flush pending promises in test environments.
  * Uses setTimeout 0 for maximum compatibility instead of setImmediate.
  */
-import { act } from '@testing-library/react';
 // For API mocks
 const flushPromises = () =>
   act(() => new Promise(resolve => setTimeout(resolve, 0)));
