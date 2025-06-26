@@ -12,17 +12,18 @@ import App from './App';
  * Always wrap async actions/state updates in act(), or use user-event async utilities/waitFor as appropriate.
  */
 /**
- * Utility: Forces all pending timers (setTimeout, setInterval) to run instantly.
+ * Utility: Forces all pending timers (setTimeout, setInterval) to run instantly and flushes microtasks.
  * Use in conjunction with jest.useFakeTimers() for deterministic tests.
  */
-const flushPromises = () =>
-  act(() =>
-    new Promise(resolve => {
-      // Run pending timers before resolving Promise, so code after timeouts can complete
-      jest.runOnlyPendingTimers();
-      setImmediate(resolve);
-    })
-  );
+const flushPromises = async () => {
+  // Flushes all pending timers and microtasks in sequence
+  await act(async () => {
+    jest.runOnlyPendingTimers();
+    // Wait for microtasks to clear after timers
+    await Promise.resolve();
+  });
+};
+
 
 describe('TVGuideChatBot App', () => {
   // Ensure all tests in this file have increased timeout for async flows.
@@ -87,25 +88,26 @@ describe('TVGuideChatBot App', () => {
     expect(input.value).toBe('What\'s on tonight?');
     expect(sendBtn).not.toBeDisabled();
 
-    // Send message - wrap in act for async state update
+    // Send message (should disable button and show loading)
     await act(async () => {
       fireEvent.click(sendBtn);
     });
 
-    // Message appears as "You" (async effect) - use waitFor for async update
+    // Message appears as "You" (wait for user message bubble)
     expect(await screen.findByText('You')).toBeInTheDocument();
     expect(screen.getByText('What\'s on tonight?')).toBeInTheDocument();
 
-    // Loading "…" shown
+    // Loading "…" shown during bot delay
     expect(screen.getByText('…')).toBeInTheDocument();
 
-    // After fake bot delay, bot reply should appear (async, wait up to 2.5s)
-    await waitFor(() =>
-      expect(
-        screen.getByText(/Let me check the current TV guide/i)
-      ).toBeInTheDocument(),
-      { timeout: 2500 }
-    );
+    // Advance timers and flush async effects for fake bot response
+    await act(async () => {
+      jest.advanceTimersByTime(1100); // long enough for minimum bot response
+      await flushPromises();
+    });
+
+    // Bot reply should now appear
+    expect(await screen.findByText(/Let me check the current TV guide/i)).toBeInTheDocument();
   });
 
   test('TVGuidePanel search: input, search button, loading and no results states', async () => {
@@ -133,7 +135,7 @@ describe('TVGuideChatBot App', () => {
 
     // Faking delay for fetchTVGuide mock ~1s (setTimeout stubbed)
     await act(async () => {
-      jest.advanceTimersByTime(1050);
+      jest.advanceTimersByTime(1100);
       await flushPromises();
     });
 
@@ -160,12 +162,12 @@ describe('TVGuideChatBot App', () => {
       fireEvent.click(searchBtn);
     });
 
-    // Wait for API to resolve and check empty state
+    // Wait for mock API delay and flush timers/promises
     await act(async () => {
-      jest.advanceTimersByTime(1050);
+      jest.advanceTimersByTime(1100);
       await flushPromises();
     });
-    // Should show the specific "No results found." label
+    // Should show the "No results found." label
     expect(screen.getByText(/No results found/i)).toBeInTheDocument();
   });
 
@@ -180,24 +182,19 @@ describe('TVGuideChatBot App', () => {
       fireEvent.keyDown(input, { key: 'Enter', code: 13 });
     });
 
-    // Loading label appears in insights
+    // Loading label appears while fetching insights
     expect(await screen.findByText(/Loading insights graph/i)).toBeInTheDocument();
 
+    // Advance fake timers and flush async for mock insights response
     await act(async () => {
-      jest.advanceTimersByTime(1050);
+      jest.advanceTimersByTime(1200); // longer than max mock delay
       await flushPromises();
     });
 
-    // After API calls, insights appear
-    expect(
-      await screen.findByText(/Did you know/i, undefined, { timeout: 2500 })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/has won 4 awards/i)
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Related Shows/i)
-    ).toBeInTheDocument();
+    // After mock API calls, insights should appear
+    expect(await screen.findByText(/Did you know/i)).toBeInTheDocument();
+    expect(screen.getByText(/has won 4 awards/i)).toBeInTheDocument();
+    expect(screen.getByText(/Related Shows/i)).toBeInTheDocument();
   });
 
   test('InsightsPanel displays empty state before interaction', () => {
@@ -259,18 +256,18 @@ describe('TVGuideChatBot App', () => {
       fireEvent.keyDown(input, { key: 'Enter', code: 13 });
     });
 
-    // Expect a bot message relating to channel (async update)
+    // Bot message should relate to channel, after async state update
     expect(
-      await screen.findByText(/Channel 12/i, undefined, { timeout: 3000 })
+      await screen.findByText(/Channel 12/i)
     ).toBeInTheDocument();
 
-    // Guide and insights should be triggered for this
+    // Wait for both guide and insight async calls to finish: advance enough time, flush microtasks/mocks
     await act(async () => {
-      jest.advanceTimersByTime(2050);
+      jest.advanceTimersByTime(2200); // plenty to cover bot + guide + insight timers
       await flushPromises();
     });
 
-    // The mock API provides results accordingly
+    // Results from TV guide and Knowledge insights should show
     expect(screen.getByText(/Bake-off/i)).toBeInTheDocument();
     expect(screen.getByText(/Knowledge Graph Insights/i)).toBeInTheDocument();
   });
