@@ -413,18 +413,22 @@ function ChatbotPanel({ messages, onSend, loading }) {
  */
 function TVGuidePanel({ guideData, loading, onSearch }) {
   const [query, setQuery] = useState("");
-  const [internalLoading, setInternalLoading] = useState(false);
+  // Use parent loading for button/input disable state and for loading indicator
+  const [searchStarted, setSearchStarted] = useState(false);
 
+  // Reset searchStarted when results returned, so loading indicator and buttons update immediately
   useEffect(() => {
-    setInternalLoading(loading);
+    if (!loading) setSearchStarted(false);
   }, [loading]);
 
   // PUBLIC_INTERFACE
   function handleSearch(e) {
     e.preventDefault();
-    if (query.trim() && !internalLoading) {
-      setInternalLoading(true);
-      Promise.resolve(onSearch(query.trim())).finally(() => setInternalLoading(false));
+    const trimmedQuery = query.trim();
+    if (trimmedQuery && !loading) {
+      setSearchStarted(true);
+      // Propagate to parent, which will toggle loading
+      Promise.resolve(onSearch(trimmedQuery)).finally(() => {});
     }
   }
 
@@ -434,7 +438,7 @@ function TVGuidePanel({ guideData, loading, onSearch }) {
   }
 
   let showState = null;
-  if (internalLoading) {
+  if (loading || searchStarted) {
     showState = (
       <div data-testid="guide-loading" style={{ color: COLORS.primary, textAlign: "center", marginTop: "30px" }}>
         Searching…
@@ -473,6 +477,9 @@ function TVGuidePanel({ guideData, loading, onSearch }) {
     );
   }
 
+  // Button disables immediately on loading or queued search and if blank
+  const disableSearch = loading || searchStarted || !query.trim();
+
   return (
     <div className="tg-panel tg-guide">
       <div className="guide-header">
@@ -488,7 +495,7 @@ function TVGuidePanel({ guideData, loading, onSearch }) {
           maxLength={100}
           placeholder="Search shows, channels…"
           aria-label="TV Guide Search"
-          disabled={internalLoading}
+          disabled={loading || searchStarted}
         />
         <button
           style={{
@@ -498,10 +505,10 @@ function TVGuidePanel({ guideData, loading, onSearch }) {
             borderRadius: "9px",
             padding: "8px 16px",
             fontWeight: "bold",
-            cursor: internalLoading ? "not-allowed" : "pointer"
+            cursor: (loading || searchStarted) ? "not-allowed" : "pointer"
           }}
           type="submit"
-          disabled={internalLoading || !query.trim()}
+          disabled={disableSearch}
         >
           Search
         </button>
@@ -569,20 +576,46 @@ function InsightsPanel({ insights, loading }) {
 async function fetchTVGuide(query) {
   // PUBLIC_INTERFACE: replace with real API endpoint integration
   await new Promise(resolve => setTimeout(resolve, 600 + Math.random() * 400)); // network delay
-  // Test support:
-  if (!query) {
+
+  // Robust empty result logic: If query is empty string or whitespace, behave as "all shows" but for unknown codes ALWAYS return []
+  const notFoundQueryList = [
+    'unknownshow', 'noresults', 'zzzzzzzz', 'nonews', 'showthatdoesnotexist', 'notfound', 'norecords'
+  ];
+  const cleanedQuery = String(query || "").trim().toLowerCase();
+
+  // Edge case: undefined query (should return empty set rather than all)
+  if (query === undefined || query === null) {
     return [];
   }
-  // Special test case for "unknownshow" or anything resembling "no results"
-  if (
-    ["unknownshow", "noresults", "zzzzzzzz", "nonews", "showthatdoesnotexist"].includes(
-      String(query).trim().toLowerCase()
-    )
-  ) {
+  // Special: All queries that mean "no such show"
+  if (notFoundQueryList.includes(cleanedQuery)) {
     return [];
   }
 
-  const channelMatch = String(query).match(/^channel[ ]*(\d+)/i);
+  // Make blank input ("", all whitespace) return a default full guide listing (simulate shows exist)
+  if (!cleanedQuery) {
+    const now = new Date();
+    return [
+      {
+        id: 1,
+        title: "Evening News",
+        channel: "Channel 1",
+        start: fmtTime(now),
+        end: fmtTime(new Date(now.getTime() + 1800000)),
+        description: "The latest headlines and breaking news."
+      },
+      {
+        id: 2,
+        title: "PrimeTime Movie",
+        channel: "Channel 2",
+        start: fmtTime(new Date(now.getTime() + 2000000)),
+        end: fmtTime(new Date(now.getTime() + 5300000)),
+        description: "Don’t miss tonight’s featured film."
+      }
+    ];
+  }
+
+  const channelMatch = cleanedQuery.match(/^channel[ ]*(\d+)/i);
   if (channelMatch) {
     // Pretend we return two shows on requested channel
     const chNum = channelMatch[1];
@@ -616,7 +649,7 @@ async function fetchTVGuide(query) {
       channel: "Channel 5",
       start: fmtTime(now),
       end: fmtTime(new Date(now.getTime() + 3600000)),
-      description: `All about amazing ${query.toLowerCase()} desserts and dazzling pastries.`
+      description: `All about amazing ${cleanedQuery} desserts and dazzling pastries.`
     },
     {
       id: 2,
@@ -624,7 +657,7 @@ async function fetchTVGuide(query) {
       channel: "Talk TV",
       start: fmtTime(new Date(now.getTime() + 3700000)),
       end: fmtTime(new Date(now.getTime() + 5400000)),
-      description: `Comedy and interviews featuring top guests from the world of ${query.toLowerCase()}.`
+      description: `Comedy and interviews featuring top guests from the world of ${cleanedQuery}.`
     }
   ];
 }
